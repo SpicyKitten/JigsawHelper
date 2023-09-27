@@ -1,5 +1,7 @@
+import keyboard
 import sys
 
+from collections import deque
 from PIL import ImageGrab, ImageQt, Image
 from PIL.Image import Resampling
 from PyQt6 import QtWidgets
@@ -105,13 +107,13 @@ def get_label(window, cropped, screen_size):
 class PaleWindow(QtWidgets.QWidget):
     def __init__(self, cropped, screen_size):
         super().__init__()
-        self.setWindowFlags(Qt.WindowType.Widget)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlag(Qt.WindowType.Widget)
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.setWindowOpacity(0.5)
+        self.opacityCycle = deque([.5, .75, .85, 1, .15, .25])
+        self.setWindowOpacity(self.opacityCycle[0])
 
         layout = QtWidgets.QVBoxLayout()
         sizegrip = QtWidgets.QSizeGrip(self)
@@ -123,6 +125,20 @@ class PaleWindow(QtWidgets.QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.oldPos = None
         self.flashEnabled = False
+        self.image_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        sizegrip.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        keyboard.on_press_key('esc', lambda _: self.toggle_click(), suppress=True)
+
+    def toggle_click(self):
+        # attributes = [Qt.WidgetAttribute.WA_NoChildEventsForParent]
+        # for attribute in attributes:
+        #     self.setAttribute(attribute, not self.testAttribute(attribute))
+        self.clearFocus()
+        self.setWindowFlags(self.windowFlags() ^ (Qt.WindowType.BypassWindowManagerHint
+                                                  | Qt.WindowType.WindowTransparentForInput))
+        self.hide()
+        self.show()
 
     def center(self):
         qr = self.frameGeometry()
@@ -133,7 +149,11 @@ class PaleWindow(QtWidgets.QWidget):
     def keyPressEvent(self, event):
         key = event.key()
         if key == Qt.Key.Key_Space:
-            self.setWindowOpacity(1.5 - self.windowOpacity())
+            self.opacityCycle.rotate(-1)
+            self.setWindowOpacity(self.opacityCycle[0])
+        # elif key == Qt.Key.Key_Escape:
+        #     self.toggle_click()
+        #
 
     def mousePressEvent(self, event):
         self.oldPos = event.position().toPoint()
